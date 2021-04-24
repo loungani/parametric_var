@@ -4,8 +4,11 @@ import numpy as np
 # import matplotlib.pyplot as plt
 # import seaborn as sn
 
+# globals
 tickers = ['MSFT', 'AAPL', 'GOOGL']
-
+ewma_lambda = .95
+z_score = 1.6449
+holding_period = 5
 
 def get_prices(ticker, start_date, end_date, column):
     return yf.download(ticker, start=start_date, end=end_date, progress=False)[column]
@@ -16,14 +19,9 @@ def something(ewma_lambda, prev, current_price, prev_price):
 
 
 def get_volatility_estimate(ewma_lambda, prices):
-    vol_estimate = 0
-
-    for i in range(0, len(prices) - 1):
-        if (i == 0):
-            vol_estimate = np.log(prices[1] / prices[0])
-        else:
-            vol_estimate = something(ewma_lambda, vol_estimate, prices[i + 1], prices[i])
-
+    vol_estimate = np.log(prices[1] / prices[0])
+    for i in range(1, len(prices) - 1):
+        vol_estimate = something(ewma_lambda, vol_estimate, prices[i + 1], prices[i])
     return vol_estimate
 
 
@@ -43,7 +41,6 @@ df.columns = tickers
 corr_mx = df.corr()
 
 vol_list = []
-ewma_lambda = .95
 
 for price_series in prices_list:
     vol_list.append(get_volatility_estimate(ewma_lambda, price_series))
@@ -68,6 +65,6 @@ weight_mx = notional_value_mx / np.sum(notional_value_mx)
 
 final = float((weight_mx.dot(vcv_mx.to_numpy())).dot(weight_mx.transpose()))
 portfolio_stddev = np.sqrt(final)
-shift = portfolio_stddev * np.sqrt(5) * 1.6449
+shift = portfolio_stddev * np.sqrt(holding_period) * z_score
 
 print(np.sum(notional_value_mx) * shift)
