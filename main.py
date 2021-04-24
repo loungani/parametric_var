@@ -73,4 +73,5 @@ portfolio_stddev = np.sqrt(final)
 z_score = st.norm.ppf(confidence_level)
 shift = portfolio_stddev * np.sqrt(holding_period) * z_score
 
-print(np.sum(notional_value_mx) * shift)
+var = np.sum(notional_value_mx) * shift
+print("$" + f'{var:,.2f}')
