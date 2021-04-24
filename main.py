@@ -1,3 +1,5 @@
+from typing import List, Any
+
 import pandas as pd
 import yfinance as yf
 import numpy as np
@@ -7,12 +9,12 @@ import scipy.stats as st
 # import seaborn as sn
 
 # globals / inputs
-tickers = ['MSFT', 'AAPL', 'GOOGL']
-ewma_lambda = .95
-confidence_level = .95
-holding_period = 5
-start_date = '2020-04-24'
-end_date = '2021-04-24'
+tickers: List[str] = ['MSFT', 'AAPL', 'GOOGL']
+ewma_lambda: float = .95
+confidence_level: float = .95
+holding_period: int = 5
+start_date: str = '2020-04-24'
+end_date: str = '2021-04-24'
 position_mx = np.array([50, 100, 10])
 
 
@@ -31,9 +33,9 @@ def get_volatility_estimate(ewma_lambda, prices):
     return vol_estimate
 
 
-returns_list = []
-prices_list = []
-forwards_list = []
+returns_list: List[float] = []
+prices_list: List[List[float]] = []
+forwards_list: List[float] = []
 
 for ticker in tickers:
     prices = get_prices(ticker, start_date, end_date, 'Close')
@@ -47,14 +49,10 @@ df.columns = tickers
 corr_mx = df.corr()
 
 vol_list = []
-
 for price_series in prices_list:
     vol_list.append(get_volatility_estimate(ewma_lambda, price_series))
-
-vol_mx = pd.DataFrame(np.zeros(corr_mx.shape), columns=tickers)
-vol_mx.index = tickers
-for i in range(0, len(vol_mx)):
-    vol_mx.loc[tickers[i]][tickers[i]] = vol_list[i]
+vol_mx = np.identity(len(vol_list))
+np.fill_diagonal(vol_mx, np.array(vol_list))
 
 vcv_mx = (vol_mx.dot(corr_mx)).dot(vol_mx)
 
@@ -62,13 +60,13 @@ weight_shape = (1, len(vcv_mx))
 forwards_mx = np.array(forwards_list)
 
 notional_value = []
-for i in range(0, len(position_mx)):
-    notional_value.append(position_mx[i] * forwards_mx[i])
+for position, forward in zip(position_mx, forwards_mx):
+    notional_value.append(position * forward)
 
 notional_value_mx = np.array(notional_value)
 weight_mx = notional_value_mx / np.sum(notional_value_mx)
 
-final = float((weight_mx.dot(vcv_mx.to_numpy())).dot(weight_mx.transpose()))
+final = float((weight_mx.dot(vcv_mx)).dot(weight_mx.transpose()))
 portfolio_stddev = np.sqrt(final)
 z_score = st.norm.ppf(confidence_level)
 shift = portfolio_stddev * np.sqrt(holding_period) * z_score
