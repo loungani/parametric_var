@@ -15,18 +15,18 @@ confidence_level: float = .95
 holding_period: int = 5
 start_date: str = '2020-04-24'
 end_date: str = '2021-04-24'
-position_mx = np.array([50, 100, 10])
+positions = np.array([50, 100, 10])
 
 
 def get_prices(ticker, start_date, end_date, column):
     return yf.download(ticker, start=start_date, end=end_date, progress=False)[column]
 
 
-def get_ew_return(ewma_lambda, prev, current_price, prev_price):
+def get_ew_return(ewma_lambda, prev, current_price, prev_price) -> float:
     return np.sqrt(ewma_lambda * np.square(prev) + (1 - ewma_lambda) * np.square(np.log(current_price / prev_price)))
 
 
-def get_volatility_estimate(ewma_lambda, prices):
+def get_volatility_estimate(ewma_lambda, prices) -> float:
     vol_estimate = np.log(prices[1] / prices[0])
     for i in range(1, len(prices) - 1):
         vol_estimate = get_ew_return(ewma_lambda, vol_estimate, prices[i + 1], prices[i])
@@ -57,19 +57,15 @@ np.fill_diagonal(vol_mx, np.array(vol_list))
 vcv_mx = (vol_mx.dot(corr_mx)).dot(vol_mx)
 
 weight_shape = (1, len(vcv_mx))
-forwards_mx = np.array(forwards_list)
+forwards = np.array(forwards_list)
 
-notional_value = []
-for position, forward in zip(position_mx, forwards_mx):
-    notional_value.append(position * forward)
-
-notional_value_mx = np.array(notional_value)
-weight_mx = notional_value_mx / np.sum(notional_value_mx)
+notional_value = positions * forwards
+weight_mx = notional_value / np.sum(notional_value)
 
 final = float((weight_mx.dot(vcv_mx)).dot(weight_mx.transpose()))
 portfolio_stddev = np.sqrt(final)
 z_score = st.norm.ppf(confidence_level)
 shift = portfolio_stddev * np.sqrt(holding_period) * z_score
 
-var = np.sum(notional_value_mx) * shift
+var = np.sum(notional_value) * shift
 print("$" + f'{var:,.2f}')
