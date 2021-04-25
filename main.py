@@ -63,8 +63,7 @@ weights = notional_values / np.sum(notional_values)
 final = float((weights.dot(vcv_mx)).dot(weights.transpose()))
 portfolio_stddev = np.sqrt(final)
 z_score = st.norm.ppf(confidence_level)
-#TODO: does z_score go inside the parentheses for np.exp ?
-shift = np.expm1(portfolio_stddev) * np.sqrt(holding_period) * z_score
+shift = np.expm1(portfolio_stddev * z_score) * np.sqrt(holding_period)
 
 var = abs(np.sum(notional_values)) * shift
 print("$" + f'{var:,.2f}')
