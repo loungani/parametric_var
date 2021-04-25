@@ -30,6 +30,29 @@ def get_volatility_estimate(ewma_lambda, prices) -> float:
     return vol_estimate
 
 
+def my_covariance(a, b):  # sample covariance
+    if len(a) != len(b):
+        raise ValueError("arrays not same size")
+
+    z = 0
+    for x, y in zip(a, b):
+        z += (x - np.average(a)) * (y - np.average(b))
+
+    return z / (len(a) - 1)
+
+
+def my_corrcoef(a, b):  # sample correlation coefficient
+    return my_covariance(a, b) / (np.sqrt(np.cov(a)) * np.sqrt(np.cov(b)))
+
+
+def create_ewma_weights(length, ewma_lambda):
+    mx = np.ones(length)
+    mx[0] = 1 - ewma_lambda
+    for i in range(1, len(mx)):
+        mx[i] = mx[i - 1] * ewma_lambda
+    return mx
+
+
 returns_list: List[List[float]] = []
 prices_list: List[List[float]] = []
 forwards_list: List[float] = []
