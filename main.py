@@ -56,13 +56,11 @@ np.fill_diagonal(vol_mx, np.array(vol_list))
 
 vcv_mx = (vol_mx.dot(corr_mx)).dot(vol_mx)
 
-weight_shape = (1, len(vcv_mx))
 forwards = np.array(forwards_list)
-
 notional_value = positions * forwards
-weight_mx = notional_value / np.sum(notional_value)
+weights = notional_value / np.sum(notional_value)
 
-final = float((weight_mx.dot(vcv_mx)).dot(weight_mx.transpose()))
+final = float((weights.dot(vcv_mx)).dot(weights.transpose()))
 portfolio_stddev = np.sqrt(final)
 z_score = st.norm.ppf(confidence_level)
 shift = portfolio_stddev * np.sqrt(holding_period) * z_score
