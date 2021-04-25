@@ -1,12 +1,9 @@
-from typing import List, Any
+from typing import List
 
 import pandas as pd
 import yfinance as yf
 import numpy as np
 import scipy.stats as st
-
-# import matplotlib.pyplot as plt
-# import seaborn as sn
 
 # globals / inputs
 tickers: List[str] = ['MSFT', 'AAPL', 'GOOGL']
@@ -33,7 +30,7 @@ def get_volatility_estimate(ewma_lambda, prices) -> float:
     return vol_estimate
 
 
-returns_list: List[float] = []
+returns_list: List[List[float]] = []
 prices_list: List[List[float]] = []
 forwards_list: List[float] = []
 
