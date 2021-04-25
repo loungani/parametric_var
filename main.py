@@ -57,13 +57,14 @@ np.fill_diagonal(vol_mx, np.array(vol_list))
 vcv_mx = (vol_mx.dot(corr_mx)).dot(vol_mx)
 
 forwards = np.array(forwards_list)
-notional_value = positions * forwards
-weights = notional_value / np.sum(notional_value)
+notional_values = positions * forwards
+weights = notional_values / np.sum(notional_values)
 
 final = float((weights.dot(vcv_mx)).dot(weights.transpose()))
 portfolio_stddev = np.sqrt(final)
 z_score = st.norm.ppf(confidence_level)
-shift = portfolio_stddev * np.sqrt(holding_period) * z_score
+#TODO: does z_score go inside the parentheses for np.exp ?
+shift = np.expm1(portfolio_stddev) * np.sqrt(holding_period) * z_score
 
-var = np.sum(notional_value) * shift
+var = abs(np.sum(notional_values)) * shift
 print("$" + f'{var:,.2f}')
