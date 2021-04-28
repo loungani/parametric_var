@@ -30,6 +30,59 @@ def get_volatility_estimate(ewma_lambda, prices) -> float:
     return vol_estimate
 
 
+def my_covariance(a, b):  # sample covariance
+    if len(a) != len(b):
+        raise ValueError("arrays not same size")
+
+    z = 0
+    for x, y in zip(a, b):
+        z += (x - np.average(a)) * (y - np.average(b))
+
+    return z / (len(a) - 1)
+
+
+def my_corrcoef(a, b):  # sample correlation coefficient
+    return my_covariance(a, b) / (np.sqrt(np.cov(a)) * np.sqrt(np.cov(b)))
+
+
+def create_ewma_weights(length, ewma_lambda, ascending):
+    mx = np.ones(length)
+    mx[0] = 1 - ewma_lambda
+    for i in range(1, len(mx)):
+        mx[i] = mx[i - 1] * ewma_lambda
+
+    # TODO: figure out how best to handle ascending vs descending dates throughout script
+    if ascending:
+        return np.flip(mx)
+    else:
+        return mx
+
+
+def get_corr_mx(df, correlation_type):
+    if correlation_type=='equally_weighted':
+        return df.corr()
+    elif correlation_type=='ewma':
+        df['w'] = create_ewma_weights(len(df), ewma_lambda, True)
+        for ticker in tickers:
+            df[ticker + "^2 * w"] = df[ticker].apply(np.square) * df['w']
+            df[ticker + " * w"] = df[ticker] * df['w']
+        corr_mx = np.ones((len(tickers), len(tickers)))
+        for i in range(0, len(tickers)):
+            for j in range(0, len(tickers)):
+                print(tickers[i], tickers[j])
+                numerator = np.sum(df[tickers[i]] * df[tickers[j]] * df['w'])
+                denominator_left = np.sqrt(np.sum(df[tickers[i]].apply(np.square) * df['w']))
+                denominator_right = np.sqrt(np.sum(df[tickers[j]].apply(np.square) * df['w']))
+                denominator = denominator_left * denominator_right
+                corr_mx[i][j] = numerator / denominator
+        corr_mx = pd.DataFrame(corr_mx)
+        corr_mx.index = tickers
+        corr_mx.columns = tickers
+        return corr_mx
+    else:
+        raise ValueError("Bad correlation type specified")
+
+
 returns_list: List[List[float]] = []
 prices_list: List[List[float]] = []
 forwards_list: List[float] = []
@@ -43,7 +96,7 @@ for ticker in tickers:
 
 df = pd.DataFrame(returns_list).transpose()
 df.columns = tickers
-corr_mx = df.corr()
+corr_mx = get_corr_mx(df, "ewma")
 
 vol_list = []
 for price_series in prices_list:
