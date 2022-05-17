@@ -6,13 +6,13 @@ import numpy as np
 import scipy.stats as st
 
 # globals / inputs
-tickers: List[str] = ['MSFT', 'AAPL', 'GOOGL']
 ewma_lambda: float = .95
-confidence_level: float = .95
-holding_period: int = 5
-start_date: str = '2020-04-24'
-end_date: str = '2021-04-24'
-positions = np.array([50, 100, 10])
+tickers: List[str] = []
+positions: List[float] = []
+confidence_level: float
+holding_period: int
+start_date: str
+end_date: str
 
 
 def get_prices(ticker, start_date, end_date, column):
@@ -86,6 +86,25 @@ def get_corr_mx(df, correlation_type):
     else:
         raise ValueError("Bad correlation type specified")
 
+
+def get_arguments():
+    io = ''
+    while io != 'Y':
+        t = input('Add ticker:')
+        p = float(input('Add position:'))
+        tickers.append(t)
+        positions.append(p)
+        io = input("Finished? (Y/N")
+    start_date = input("Enter start date: (YYYY-MM-DD)")
+    end_date = input("Enter end_date: YYYY-MM-DD")
+    confidence_level = float(input("Enter confidence level as decimal."))
+    holding_period = int(input("Enter holding period as integer."))
+    return tickers, positions, start_date, end_date, confidence_level, holding_period
+
+
+tickers, positions, start_date, end_date, confidence_level, holding_period = get_arguments()
+
+# main body of code
 
 returns_list: List[List[float]] = []
 prices_list: List[List[float]] = []
