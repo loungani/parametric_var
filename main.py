@@ -1,5 +1,3 @@
-from typing import List
-
 import numpy as np
 import pandas as pd
 import scipy.stats as st
@@ -31,36 +29,12 @@ def my_corrcoef(a, b):  # sample correlation coefficient
     return my_covariance(a, b) / (np.sqrt(np.cov(a)) * np.sqrt(np.cov(b)))
 
 
-tickers, positions, start_date, end_date, confidence_level, holding_period = user_input.get_arguments()
-
 # main body of code
 
-forwards_list: List[float] = []
-
-first = True
-for ticker in tickers:
-    prices = query_data.get_prices(ticker, start_date, end_date, 'Close')
-    returns = np.log(prices).diff()[1:]
-
-    if first:
-        prices_df = prices.to_frame().rename(columns={specified_column: ticker})
-        returns_df = returns.to_frame().rename(columns={specified_column: ticker})
-        first = False
-    else:
-        prices_df = prices_df.join(prices.to_frame().rename(columns={specified_column: ticker}))
-        returns_df = returns_df.join(returns.to_frame().rename(columns={specified_column: ticker}))
-
-    forwards_list.append(list(prices).pop())
-
+tickers, positions, start_date, end_date, confidence_level, holding_period = user_input.get_arguments()
+prices_df, returns_df, forwards_list = query_data.get(tickers, start_date, end_date, specified_column)
 corr_mx = numerical_functions.get_corr_mx(returns_df, "ewma", tickers, ewma_lambda)
-
-vol_list = []
-for column in prices_df:
-    vol_list.append(numerical_functions.get_volatility_estimate(ewma_lambda, prices_df[column], "ewma"))
-vol_mx = np.identity(len(vol_list))
-np.fill_diagonal(vol_mx, np.array(vol_list))
-vol_mx = pd.DataFrame(vol_mx, columns=tickers, index=tickers)
-
+vol_mx = numerical_functions.get_vol_mx(prices_df, ewma_lambda, "ewma")
 vcv_mx = (vol_mx.dot(corr_mx)).dot(vol_mx)
 
 forwards = np.array(forwards_list)

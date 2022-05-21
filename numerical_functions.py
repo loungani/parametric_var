@@ -53,3 +53,13 @@ def get_corr_mx(df, correlation_type, tickers, ewma_lambda):
         return corr_mx
     else:
         raise ValueError("Bad correlation type specified")
+
+
+def get_vol_mx(prices_df, ewma_lambda, averaging_type):
+    vol_list = []
+    for column in prices_df:
+        vol_list.append(get_volatility_estimate(ewma_lambda, prices_df[column], averaging_type))
+    vol_mx = np.identity(len(vol_list))
+    np.fill_diagonal(vol_mx, np.array(vol_list))
+    vol_mx = pd.DataFrame(vol_mx, columns=prices_df.columns, index=prices_df.columns)
+    return vol_mx
