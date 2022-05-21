@@ -14,21 +14,6 @@ end_date: str
 specified_column: str = "Close"
 
 
-def my_covariance(a, b):  # sample covariance
-    if len(a) != len(b):
-        raise ValueError("arrays not same size")
-
-    z = 0
-    for x, y in zip(a, b):
-        z += (x - np.average(a)) * (y - np.average(b))
-
-    return z / (len(a) - 1)
-
-
-def my_corrcoef(a, b):  # sample correlation coefficient
-    return my_covariance(a, b) / (np.sqrt(np.cov(a)) * np.sqrt(np.cov(b)))
-
-
 # main body of code
 
 tickers, positions, start_date, end_date, confidence_level, holding_period = user_input.get_arguments()
