@@ -1,5 +1,6 @@
 from typing import List
 import helper_functions
+import pandas as pd
 
 
 def get_boolean(message):
@@ -50,3 +51,12 @@ def get_arguments():
             helper_functions.new_line()
 
     return tickers, positions, start_date, end_date, confidence_level, holding_period
+
+
+def export_diagnostics(positions_detail_df, prices_df, returns_df, corr_mx, vol_mx, vcv_mx):
+    positions_detail_df.to_csv("positions_detail.csv")
+    prices_df.to_csv("prices.csv")
+    returns_df.to_csv("returns.csv")
+    corr_mx.to_csv("correlation_matrix.csv")
+    vol_mx.to_csv("volatility_matrix.csv")
+    vcv_mx.to_csv("variance_covariance_matrix.csv")

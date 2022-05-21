@@ -35,5 +35,6 @@ var = abs(np.sum(notional_values) * shift)
 helper_functions.output("$" + f'{var:,.2f}')
 
 if user_input.get_boolean("Export diagnostics? (Y/N) "):
-    pass
-    #user_input.export_diagnostics(positions_df, prices_df, returns_df, corr_mx, vol_mx, vcv_mx)
+    positions_detail_df = pd.DataFrame(list(zip(tickers, positions, weights, forwards, notional_values)),
+                                       columns=['tickers', 'positions', 'weights', 'forwards', 'notional_values'])
+    user_input.export_diagnostics(positions_detail_df, prices_df, returns_df, corr_mx, vol_mx, vcv_mx)
