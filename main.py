@@ -13,7 +13,6 @@ start_date: str
 end_date: str
 specified_column: str = "Close"
 
-
 # main body of code
 
 tickers, positions, start_date, end_date, confidence_level, holding_period = user_input.get_arguments()
