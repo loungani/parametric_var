@@ -25,6 +25,8 @@ def get_arguments():
             helper_functions.output("Current ticker list: " + " ".join(tickers))
             t = input('Add ticker: ')
             p = float(input('Add position: '))
+            if t in tickers:
+                raise ValueError("ticker: " + str(t) + " already found in tickers list.")
             tickers.append(t)
             positions.append(p)
             need_inputs = get_boolean("Enter another ticker? (Y/N) ")

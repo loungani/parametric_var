@@ -31,10 +31,15 @@ portfolio_stddev = np.sqrt(final)
 z_score = st.norm.ppf(confidence_level)
 shift = np.expm1(portfolio_stddev * z_score) * np.sqrt(holding_period)
 
+# det: should always be between 0 and 1. values close to 0 indicate multicollinearity
+det = np.linalg.det(corr_mx)
+helper_functions.output("Determinant of correlation matrix: " + str(det))
+
 var = abs(np.sum(notional_values) * shift)
-helper_functions.output("$" + f'{var:,.2f}')
+helper_functions.output("VaR: $" + f'{var:,.2f}')
 
 if user_input.get_boolean("Export diagnostics? (Y/N) "):
     positions_detail_df = pd.DataFrame(list(zip(tickers, positions, weights, forwards, notional_values)),
                                        columns=['tickers', 'positions', 'weights', 'forwards', 'notional_values'])
+    positions_detail_df.set_index('tickers', inplace=True)
     user_input.export_diagnostics(positions_detail_df, prices_df, returns_df, corr_mx, vol_mx, vcv_mx)
