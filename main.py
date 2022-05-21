@@ -4,6 +4,7 @@ import scipy.stats as st
 import user_input
 import query_data
 import numerical_functions
+import helper_functions
 
 # globals / inputs
 ewma_lambda: float = .95
@@ -31,4 +32,8 @@ z_score = st.norm.ppf(confidence_level)
 shift = np.expm1(portfolio_stddev * z_score) * np.sqrt(holding_period)
 
 var = abs(np.sum(notional_values) * shift)
-print("$" + f'{var:,.2f}')
+helper_functions.output("$" + f'{var:,.2f}')
+
+if user_input.get_boolean("Export diagnostics? (Y/N) "):
+    pass
+    #user_input.export_diagnostics(positions_df, prices_df, returns_df, corr_mx, vol_mx, vcv_mx)

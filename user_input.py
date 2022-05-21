@@ -1,19 +1,32 @@
 from typing import List
 import helper_functions
 
+
+def get_boolean(message):
+    need_input = True
+    while need_input:
+        io = input(message)
+        if io == 'Y':
+            return True
+        elif io == 'N':
+            return False
+        else:
+            helper_functions.output("Expected Y or N. Received: " + io)
+
+
 def get_arguments():
     tickers: List[str] = []
     positions: List[float] = []
 
-    io = ''
-    while io != 'Y':
+    need_inputs = True
+    while need_inputs:
         try:
             helper_functions.output("Current ticker list: " + " ".join(tickers))
             t = input('Add ticker: ')
             p = float(input('Add position: '))
             tickers.append(t)
             positions.append(p)
-            io = input("Finished? (Y/N) ")
+            need_inputs = get_boolean("Enter another ticker? (Y/N) ")
             helper_functions.new_line()
         except Exception as e:
             helper_functions.output("Ticker/position not accepted.")
