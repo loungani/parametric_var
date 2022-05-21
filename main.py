@@ -1,7 +1,7 @@
 from typing import List
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import scipy.stats as st
 import user_input
 import query_data
@@ -13,22 +13,7 @@ confidence_level: float
 holding_period: int
 start_date: str
 end_date: str
-
-
-def get_ew_return(ewma_lambda, prev, current_price, prev_price) -> float:
-    return np.sqrt(ewma_lambda * np.square(prev) + (1 - ewma_lambda) * np.square(np.log(current_price / prev_price)))
-
-
-def get_volatility_estimate(ewma_lambda, prices, averaging_type) -> float:
-    if averaging_type == "simple":
-        return np.average(np.abs(np.log(prices).diff()[1:]))
-    elif averaging_type == "ewma":
-        vol_estimate = np.log(prices[1] / prices[0])
-        for i in range(1, len(prices) - 1):
-            vol_estimate = get_ew_return(ewma_lambda, vol_estimate, prices[i + 1], prices[i])
-        return vol_estimate
-    else:
-        raise ValueError("Bad averaging type passed to get_volatility_estimate")
+specified_column: str = "Close"
 
 
 def my_covariance(a, b):  # sample covariance
@@ -50,26 +35,31 @@ tickers, positions, start_date, end_date, confidence_level, holding_period = use
 
 # main body of code
 
-returns_list: List[List[float]] = []
-prices_list: List[List[float]] = []
 forwards_list: List[float] = []
 
+first = True
 for ticker in tickers:
     prices = query_data.get_prices(ticker, start_date, end_date, 'Close')
     returns = np.log(prices).diff()[1:]
-    returns_list.append(returns)
-    prices_list.append(prices)
+
+    if first:
+        prices_df = prices.to_frame().rename(columns={specified_column: ticker})
+        returns_df = returns.to_frame().rename(columns={specified_column: ticker})
+        first = False
+    else:
+        prices_df = prices_df.join(prices.to_frame().rename(columns={specified_column: ticker}))
+        returns_df = returns_df.join(returns.to_frame().rename(columns={specified_column: ticker}))
+
     forwards_list.append(list(prices).pop())
 
-df = pd.DataFrame(returns_list).transpose()
-df.columns = tickers
-corr_mx = numerical_functions.get_corr_mx(df, "ewma", tickers, ewma_lambda)
+corr_mx = numerical_functions.get_corr_mx(returns_df, "ewma", tickers, ewma_lambda)
 
 vol_list = []
-for price_series in prices_list:
-    vol_list.append(get_volatility_estimate(ewma_lambda, price_series, "ewma"))
+for column in prices_df:
+    vol_list.append(numerical_functions.get_volatility_estimate(ewma_lambda, prices_df[column], "ewma"))
 vol_mx = np.identity(len(vol_list))
 np.fill_diagonal(vol_mx, np.array(vol_list))
+vol_mx = pd.DataFrame(vol_mx, columns=tickers, index=tickers)
 
 vcv_mx = (vol_mx.dot(corr_mx)).dot(vol_mx)
 

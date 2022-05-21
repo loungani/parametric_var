@@ -2,6 +2,22 @@ import numpy as np
 import pandas as pd
 
 
+def get_ew_return(ewma_lambda, prev, current_price, prev_price) -> float:
+    return np.sqrt(ewma_lambda * np.square(prev) + (1 - ewma_lambda) * np.square(np.log(current_price / prev_price)))
+
+
+def get_volatility_estimate(ewma_lambda, prices, averaging_type) -> float:
+    if averaging_type == "simple":
+        return np.average(np.abs(np.log(prices).diff()[1:]))
+    elif averaging_type == "ewma":
+        vol_estimate = np.log(prices[1] / prices[0])
+        for i in range(1, len(prices) - 1):
+            vol_estimate = get_ew_return(ewma_lambda, vol_estimate, prices[i + 1], prices[i])
+        return vol_estimate
+    else:
+        raise ValueError("Bad averaging type passed to get_volatility_estimate")
+
+
 def create_ewma_weights(length, ewma_lambda, ascending):
     mx = np.ones(length)
     mx[0] = 1 - ewma_lambda
