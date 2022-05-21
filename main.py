@@ -1,22 +1,18 @@
 from typing import List
 
 import pandas as pd
-import yfinance as yf
 import numpy as np
 import scipy.stats as st
+import user_input
+import query_data
+import numerical_functions
 
 # globals / inputs
 ewma_lambda: float = .95
-tickers: List[str] = []
-positions: List[float] = []
 confidence_level: float
 holding_period: int
 start_date: str
 end_date: str
-
-
-def get_prices(ticker, start_date, end_date, column):
-    return yf.download(ticker, start=start_date, end=end_date, progress=False)[column]
 
 
 def get_ew_return(ewma_lambda, prev, current_price, prev_price) -> float:
@@ -50,59 +46,7 @@ def my_corrcoef(a, b):  # sample correlation coefficient
     return my_covariance(a, b) / (np.sqrt(np.cov(a)) * np.sqrt(np.cov(b)))
 
 
-def create_ewma_weights(length, ewma_lambda, ascending):
-    mx = np.ones(length)
-    mx[0] = 1 - ewma_lambda
-    for i in range(1, len(mx)):
-        mx[i] = mx[i - 1] * ewma_lambda
-
-    # TODO: figure out how best to handle ascending vs descending dates throughout script
-    if ascending:
-        return np.flip(mx)
-    else:
-        return mx
-
-
-def get_corr_mx(df, correlation_type):
-    if correlation_type == 'simple':
-        return df.corr()
-    elif correlation_type == 'ewma':
-        df['w'] = create_ewma_weights(len(df), ewma_lambda, True)
-        for ticker in tickers:
-            df[ticker + "^2 * w"] = df[ticker].apply(np.square) * df['w']
-            df[ticker + " * w"] = df[ticker] * df['w']
-        corr_mx = np.ones((len(tickers), len(tickers)))
-        for i in range(0, len(tickers)):
-            for j in range(0, len(tickers)):
-                numerator = np.sum(df[tickers[i]] * df[tickers[j]] * df['w'])
-                denominator_left = np.sqrt(np.sum(df[tickers[i]].apply(np.square) * df['w']))
-                denominator_right = np.sqrt(np.sum(df[tickers[j]].apply(np.square) * df['w']))
-                denominator = denominator_left * denominator_right
-                corr_mx[i][j] = numerator / denominator
-        corr_mx = pd.DataFrame(corr_mx)
-        corr_mx.index = tickers
-        corr_mx.columns = tickers
-        return corr_mx
-    else:
-        raise ValueError("Bad correlation type specified")
-
-
-def get_arguments():
-    io = ''
-    while io != 'Y':
-        t = input('Add ticker:')
-        p = float(input('Add position:'))
-        tickers.append(t)
-        positions.append(p)
-        io = input("Finished? (Y/N")
-    start_date = input("Enter start date: (YYYY-MM-DD)")
-    end_date = input("Enter end_date: YYYY-MM-DD")
-    confidence_level = float(input("Enter confidence level as decimal."))
-    holding_period = int(input("Enter holding period as integer."))
-    return tickers, positions, start_date, end_date, confidence_level, holding_period
-
-
-tickers, positions, start_date, end_date, confidence_level, holding_period = get_arguments()
+tickers, positions, start_date, end_date, confidence_level, holding_period = user_input.get_arguments()
 
 # main body of code
 
@@ -111,7 +55,7 @@ prices_list: List[List[float]] = []
 forwards_list: List[float] = []
 
 for ticker in tickers:
-    prices = get_prices(ticker, start_date, end_date, 'Close')
+    prices = query_data.get_prices(ticker, start_date, end_date, 'Close')
     returns = np.log(prices).diff()[1:]
     returns_list.append(returns)
     prices_list.append(prices)
@@ -119,7 +63,7 @@ for ticker in tickers:
 
 df = pd.DataFrame(returns_list).transpose()
 df.columns = tickers
-corr_mx = get_corr_mx(df, "ewma")
+corr_mx = numerical_functions.get_corr_mx(df, "ewma", tickers, ewma_lambda)
 
 vol_list = []
 for price_series in prices_list:
