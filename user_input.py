@@ -42,7 +42,8 @@ def get_arguments():
             end_date = input("Enter end date: (YYYY-MM-DD) ")
             confidence_level = float(input("Enter confidence level as decimal: "))
             if confidence_level >= 1 or confidence_level <= 0:
-                raise ValueError("Expected confidence_level strictly between 0 and 1. Received: " + str(confidence_level))
+                raise ValueError(
+                    "Expected confidence_level strictly between 0 and 1. Received: " + str(confidence_level))
             holding_period = int(input("Enter holding period as integer: "))
             if holding_period < 1:
                 raise ValueError("Expected holding period geq 1. Received: " + str(holding_period))
@@ -55,10 +56,13 @@ def get_arguments():
     return tickers, positions, start_date, end_date, confidence_level, holding_period
 
 
-def export_diagnostics(positions_detail_df, prices_df, returns_df, corr_mx, vol_mx, vcv_mx):
+def export_diagnostics(positions_detail_df, prices_df, returns_df, corr_mx, vol_mx,
+                       vcv_mx, eigenvalue_df, eigenvector_df):
     positions_detail_df.to_csv("positions_detail.csv")
     prices_df.to_csv("prices.csv")
     returns_df.to_csv("returns.csv")
     corr_mx.to_csv("correlation_matrix.csv")
     vol_mx.to_csv("volatility_matrix.csv")
     vcv_mx.to_csv("variance_covariance_matrix.csv")
+    eigenvalue_df.to_csv("eigenvalues.csv")
+    eigenvector_df.to_csv("eigenvectors.csv")
