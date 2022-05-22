@@ -41,6 +41,15 @@ helper_functions.output("Determinant of correlation matrix: " + str(det))
 w, v = np.linalg.eig(vcv_mx)  # note: eigenvectors are returned as columns in the matrix
 if any([eigenvalue < 0 for eigenvalue in w]):
     helper_functions.output("Warning: negative eigenvalue found. Covariance matrix not positive semi-definite.")
+eigenvalue_df = pd.DataFrame(w)
+eigenvector_df = pd.DataFrame(v)
+eigenvalue_df.rename(columns={0: "eigenvalue"}, inplace=True)
+eigenvalue_df.sort_values(by=['eigenvalue'], ascending=False, inplace=True)
+eigenvalue_df.reset_index(inplace=True)
+eigenvalue_df['proportion_of_variance'] = eigenvalue_df['eigenvalue']/np.sum(eigenvalue_df['eigenvalue'])
+eigenvalue_df['cumulative_proportion_of_variance'] = [np.sum(eigenvalue_df['proportion_of_variance'][0:(i+1)])
+                                                      for i in eigenvalue_df.index]
+
 
 if user_input.get_boolean("View eigenvector plots? (Y/N) "):
     for (eigenvalue, eigenvector) in zip(w, np.transpose(v)):
@@ -49,11 +58,25 @@ if user_input.get_boolean("View eigenvector plots? (Y/N) "):
         plt.bar(tickers, eigenvector)
         plt.show()
 
+    cumulative_plot = [0]
+    cumulative_plot.extend(list(eigenvalue_df['cumulative_proportion_of_variance']))
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 5))
+    fig.suptitle('Proportion of variance explained by principal components')
+    ax1.bar(["{:.1e}".format(eigenvalue) for eigenvalue
+             in eigenvalue_df['eigenvalue']], eigenvalue_df['proportion_of_variance'])
+    ax1.set_xlabel("eigenvalue")
+    ax1.set_ylabel("proportion of variance explained")
+    ax2.plot(cumulative_plot, marker="^")
+    ax2.set_xlabel("# of principal components (sorted)")
+    ax2.set_ylabel("Cumulative prop. of variance explained")
+    ax2.set_ylim([0, 1])
+
+    plt.show()
+
 if user_input.get_boolean("Export diagnostics? (Y/N) "):
     positions_detail_df = pd.DataFrame(list(zip(tickers, positions, weights, forwards, notional_values)),
                                        columns=['tickers', 'positions', 'weights', 'forwards', 'notional_values'])
     positions_detail_df.set_index('tickers', inplace=True)
-    eigenvalue_df = pd.DataFrame(w)
-    eigenvector_df = pd.DataFrame(v)
     user_input.export_diagnostics(positions_detail_df, prices_df, returns_df,
                                   corr_mx, vol_mx, vcv_mx, eigenvalue_df, eigenvector_df)
