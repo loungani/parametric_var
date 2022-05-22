@@ -39,6 +39,8 @@ helper_functions.output("VaR: $" + f'{var:,.2f}')
 det = np.linalg.det(corr_mx)
 helper_functions.output("Determinant of correlation matrix: " + str(det))
 w, v = np.linalg.eig(vcv_mx)  # note: eigenvectors are returned as columns in the matrix
+if any([eigenvalue < 0 for eigenvalue in w]):
+    helper_functions.output("Warning: negative eigenvalue found. Covariance matrix not positive semi-definite.")
 
 if user_input.get_boolean("View eigenvector plots? (Y/N) "):
     for (eigenvalue, eigenvector) in zip(w, np.transpose(v)):
