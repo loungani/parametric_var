@@ -63,3 +63,13 @@ def get_vol_mx(prices_df, ewma_lambda, averaging_type):
     np.fill_diagonal(vol_mx, np.array(vol_list))
     vol_mx = pd.DataFrame(vol_mx, columns=prices_df.columns, index=prices_df.columns)
     return vol_mx
+
+
+def run_principal_components_analysis(num_components: int, eigenvalue_df, eigenvector_df):
+    reduced_eigenvalue_array = eigenvalue_df['eigenvalue'].copy()
+    reduced_eigenvalue_array[num_components:] = 0
+    reduced_eigenvalue_matrix = np.identity(len(eigenvalue_df))
+    np.fill_diagonal(reduced_eigenvalue_matrix, np.array(reduced_eigenvalue_array))
+    reduced_covariance_matrix = \
+        eigenvector_df.dot(reduced_eigenvalue_matrix).dot(np.transpose(eigenvector_df))
+    return pd.DataFrame(reduced_eigenvalue_matrix), pd.DataFrame(reduced_covariance_matrix)

@@ -15,6 +15,27 @@ def get_boolean(message):
             helper_functions.output("Expected Y or N. Received: " + io)
 
 
+def get_int(message, int_min=None, int_max=None):
+    need_input = True
+    while need_input:
+        try:
+            io = input(message)
+            if int(io) != float(io):
+                raise TypeError("Integer not entered in get_int field.")
+            io = int(io)
+            if int_min is not None:
+                if io < int_min:
+                    raise ValueError("Expected input greater than: " + str(int_min) +
+                                     ". Received: " + str(io))
+            if int_max is not None:
+                if io > int_max:
+                    raise ValueError("Expected input less than: " + str(int_max) +
+                                     ". Received: " + str(io))
+            return io
+        except Exception as e:
+            helper_functions.output("Error caught in get_int. Stack trace: " + str(e))
+
+
 def get_arguments():
     tickers: List[str] = []
     positions: List[float] = []
@@ -66,3 +87,8 @@ def export_diagnostics(positions_detail_df, prices_df, returns_df, corr_mx, vol_
     vcv_mx.to_csv("variance_covariance_matrix.csv")
     eigenvalue_df.to_csv("eigenvalues.csv")
     eigenvector_df.to_csv("eigenvectors.csv")
+
+
+def export_pca(reduced_eigenvalue_matrix, reduced_covariance_matrix):
+    reduced_eigenvalue_matrix.to_csv("reduced_eigenvalue_matrix.csv")
+    reduced_covariance_matrix.to_csv("reduced_covariance_matrix.csv")

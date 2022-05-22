@@ -33,23 +33,28 @@ z_score = st.norm.ppf(confidence_level)
 shift = np.expm1(portfolio_stddev * z_score) * np.sqrt(holding_period)
 
 var = abs(np.sum(notional_values) * shift)
-helper_functions.output("VaR: $" + f'{var:,.2f}')
+helper_functions.output(f"Portfolio standard deviation: {portfolio_stddev:.2%}")
+helper_functions.output(f"Associated log return: {shift:.2%}")
+helper_functions.output(f"Associated percentage return: {portfolio_stddev * z_score * np.sqrt(holding_period):.2%}")
+helper_functions.output("Total portfolio value: $" + f'{np.sum(notional_values):,.2f}')
+helper_functions.output(str(holding_period) + "-day" + f"{confidence_level: .2%}"
+                        + " VaR: $" + f'{var:,.2f}')
 
 # det: should always be between 0 and 1. values close to 0 indicate multicollinearity
 det = np.linalg.det(corr_mx)
 helper_functions.output("Determinant of correlation matrix: " + str(det))
 w, v = np.linalg.eig(vcv_mx)  # note: eigenvectors are returned as columns in the matrix
 if any([eigenvalue < 0 for eigenvalue in w]):
-    helper_functions.output("Warning: negative eigenvalue found. Covariance matrix not positive semi-definite.")
+    helper_functions.output("Warning: negative eigenvalue found. "
+                            "Covariance matrix not positive semi-definite.")
 eigenvalue_df = pd.DataFrame(w)
 eigenvector_df = pd.DataFrame(v)
 eigenvalue_df.rename(columns={0: "eigenvalue"}, inplace=True)
 eigenvalue_df.sort_values(by=['eigenvalue'], ascending=False, inplace=True)
 eigenvalue_df.reset_index(inplace=True)
-eigenvalue_df['proportion_of_variance'] = eigenvalue_df['eigenvalue']/np.sum(eigenvalue_df['eigenvalue'])
-eigenvalue_df['cumulative_proportion_of_variance'] = [np.sum(eigenvalue_df['proportion_of_variance'][0:(i+1)])
+eigenvalue_df['proportion_of_variance'] = eigenvalue_df['eigenvalue'] / np.sum(eigenvalue_df['eigenvalue'])
+eigenvalue_df['cumulative_proportion_of_variance'] = [np.sum(eigenvalue_df['proportion_of_variance'][0:(i + 1)])
                                                       for i in eigenvalue_df.index]
-
 
 if user_input.get_boolean("View eigenvector plots? (Y/N) "):
     for (eigenvalue, eigenvector) in zip(w, np.transpose(v)):
@@ -71,8 +76,28 @@ if user_input.get_boolean("View eigenvector plots? (Y/N) "):
     ax2.set_xlabel("# of principal components (sorted)")
     ax2.set_ylabel("Cumulative prop. of variance explained")
     ax2.set_ylim([0, 1])
-
     plt.show()
+
+reduced_eigenvalue_matrix = None
+reduced_covariance_matrix = None
+if user_input.get_boolean("Reduce dimensionality using PCA? (Y/N) "):
+    max_components = len(eigenvalue_df)
+    num_components = user_input.get_int("Enter desired number of components (1 to " +
+                                        str(max_components) + ") ", int_min=0, int_max=max_components)
+    reduced_eigenvalue_matrix, reduced_covariance_matrix = \
+        numerical_functions.run_principal_components_analysis(num_components, eigenvalue_df, eigenvector_df)
+
+    adjusted_final = float((weights.dot(reduced_covariance_matrix)).dot(weights.transpose()))
+    adjusted_portfolio_stddev = np.sqrt(adjusted_final)
+    adjusted_shift = np.expm1(adjusted_portfolio_stddev * z_score) * np.sqrt(holding_period)
+    adjusted_var = abs(np.sum(notional_values) * adjusted_shift)
+
+    helper_functions.output(f"PCA-adjusted portfolio standard deviation: {adjusted_portfolio_stddev:.2%}")
+    helper_functions.output(f"PCA-adjusted log return: {adjusted_shift:.2%}")
+    helper_functions.output(f"PCA-adjusted percentage return: "
+                            f"{adjusted_portfolio_stddev * z_score * np.sqrt(holding_period):.2%}")
+    helper_functions.output(str(holding_period) + "-day" + f"{confidence_level: .2%}"
+                            + " PCA-adjusted VaR: $" + f'{adjusted_var:,.2f}')
 
 if user_input.get_boolean("Export diagnostics? (Y/N) "):
     positions_detail_df = pd.DataFrame(list(zip(tickers, positions, weights, forwards, notional_values)),
@@ -80,3 +105,5 @@ if user_input.get_boolean("Export diagnostics? (Y/N) "):
     positions_detail_df.set_index('tickers', inplace=True)
     user_input.export_diagnostics(positions_detail_df, prices_df, returns_df,
                                   corr_mx, vol_mx, vcv_mx, eigenvalue_df, eigenvector_df)
+    if (reduced_eigenvalue_matrix is not None) and (reduced_covariance_matrix is not None):
+        user_input.export_pca(reduced_eigenvalue_matrix, reduced_covariance_matrix)
