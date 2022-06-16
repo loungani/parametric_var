@@ -8,7 +8,7 @@ def get_ew_return(ewma_lambda, prev, current_price, prev_price) -> float:
 
 def get_volatility_estimate(ewma_lambda, prices, averaging_type) -> float:
     if averaging_type == "simple":
-        return np.average(np.abs(np.log(prices).diff()[1:]))
+        return float(np.std(np.log(prices).diff()[1:]))
     elif averaging_type == "ewma":
         vol_estimate = np.log(prices[1] / prices[0])
         for i in range(1, len(prices) - 1):
