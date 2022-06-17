@@ -31,14 +31,33 @@ final = float((weights.dot(vcv_mx)).dot(weights.transpose()))
 portfolio_stddev = np.sqrt(final)
 z_score = st.norm.ppf(confidence_level)
 shift = np.expm1(portfolio_stddev * z_score * np.sqrt(holding_period))
-
 var = abs(np.sum(notional_values) * shift)
+
+# Diagnostic: full valuation test / rigorous
+valuations_df: pd.DataFrame = numerical_functions.calculate_valuations(prices_df, tickers, positions)
+valuation_returns = np.log(valuations_df).diff()[1:]
+val_corr_mx = numerical_functions.get_corr_mx(valuation_returns, "ewma", ['Portfolio Valuation'],
+                                              ewma_lambda) # should always be 1 matrix
+val_vol_mx = numerical_functions.get_vol_mx(valuations_df, ewma_lambda, "ewma")
+val_vcv_mx = (val_vol_mx.dot(val_corr_mx)).dot(val_vol_mx)
+
+val_notional_values = [valuations_df.iloc[-1]['Portfolio Valuation']]
+val_weights = val_notional_values / np.sum(val_notional_values)
+val_final = float((val_weights.dot(val_vcv_mx)).dot(val_weights.transpose()))
+val_portfolio_stddev = np.sqrt(val_final)
+val_shift = np.expm1(val_portfolio_stddev * z_score * np.sqrt(holding_period))
+val_var = abs(np.sum(val_notional_values) * val_shift)
+
 helper_functions.output(f"Portfolio standard deviation: {portfolio_stddev:.2%}")
-helper_functions.output(f"Associated log return: {shift:.2%}")
-helper_functions.output(f"Associated percentage return: {portfolio_stddev * z_score * np.sqrt(holding_period):.2%}")
+helper_functions.output(f"Associated % return: {shift:.2%}")
+helper_functions.output(f"Associated % return (full portfolio / rigorous): {val_shift:.2%}")
+helper_functions.output(f"Associated log return: {portfolio_stddev * z_score * np.sqrt(holding_period):.2%}")
+helper_functions.output(f"Associated log return (full portfolio / rigorous): {val_portfolio_stddev * z_score * np.sqrt(holding_period):.2%}")
 helper_functions.output("Total portfolio value: $" + f'{np.sum(notional_values):,.2f}')
 helper_functions.output(str(holding_period) + "-day" + f"{confidence_level: .2%}"
                         + " VaR: $" + f'{var:,.2f}')
+helper_functions.output(str(holding_period) + "-day" + f"{confidence_level: .2%}"
+                        + " VaR (full portfolio / rigorous): $" + f'{val_var:,.2f}')
 
 # det: should always be between 0 and 1. values close to 0 indicate multicollinearity
 det = np.linalg.det(corr_mx)
@@ -103,7 +122,8 @@ if user_input.get_boolean("Export diagnostics? (Y/N) "):
     positions_detail_df = pd.DataFrame(list(zip(tickers, positions, weights, forwards, notional_values)),
                                        columns=['tickers', 'positions', 'weights', 'forwards', 'notional_values'])
     positions_detail_df.set_index('tickers', inplace=True)
-    user_input.export_diagnostics(positions_detail_df, prices_df, returns_df,
-                                  corr_mx, vol_mx, vcv_mx, eigenvalue_df, eigenvector_df)
+    user_input.export_diagnostics(positions_detail_df, prices_df, returns_df, valuations_df,
+                                  valuation_returns, corr_mx, vol_mx, vcv_mx, eigenvalue_df,
+                                  eigenvector_df)
     if (reduced_eigenvalue_matrix is not None) and (reduced_covariance_matrix is not None):
         user_input.export_pca(reduced_eigenvalue_matrix, reduced_covariance_matrix)

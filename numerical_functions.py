@@ -1,3 +1,5 @@
+from typing import List
+
 import numpy as np
 import pandas as pd
 
@@ -73,3 +75,15 @@ def run_principal_components_analysis(num_components: int, eigenvalue_df, eigenv
     reduced_covariance_matrix = \
         eigenvector_df.dot(reduced_eigenvalue_matrix).dot(np.transpose(eigenvector_df))
     return pd.DataFrame(reduced_eigenvalue_matrix), pd.DataFrame(reduced_covariance_matrix)
+
+
+def calculate_valuations(prices_df, tickers, positions):
+    positions_detail = pd.DataFrame({'ticker': tickers, 'position': positions})
+    valuations: List[float] = []
+    for date in prices_df.index:
+        valuation = 0
+        for idx, price in enumerate(prices_df.loc[date]):
+            valuation += price * positions_detail.loc[idx]['position']
+        valuations += [valuation]
+    valuations_df = pd.DataFrame({'Portfolio Valuation': valuations}, index=prices_df.index)
+    return valuations_df
