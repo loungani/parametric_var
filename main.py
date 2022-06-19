@@ -27,11 +27,13 @@ forwards = np.array(forwards_list)
 notional_values = positions * forwards
 weights = notional_values / np.sum(notional_values)
 
+# TODO: add calculation to account for mu not necessarily equal to 0
 final = float((weights.dot(vcv_mx)).dot(weights.transpose()))
 portfolio_stddev = np.sqrt(final)
-z_score = st.norm.ppf(confidence_level)
-shift = np.expm1(portfolio_stddev * z_score * np.sqrt(holding_period))
-var = abs(np.sum(notional_values) * shift)
+z_score = st.norm.ppf(1-confidence_level)
+log_return = portfolio_stddev * z_score * np.sqrt(holding_period)
+percentage_return = np.expm1(log_return)
+var = np.sum(notional_values) * percentage_return * -1
 
 # Diagnostic: full valuation test / rigorous
 valuations_df: pd.DataFrame = numerical_functions.calculate_valuations(prices_df, tickers, positions)
@@ -45,12 +47,13 @@ val_notional_values = [valuations_df.iloc[-1]['Portfolio Valuation']]
 val_weights = val_notional_values / np.sum(val_notional_values)
 val_final = float((val_weights.dot(val_vcv_mx)).dot(val_weights.transpose()))
 val_portfolio_stddev = np.sqrt(val_final)
-val_shift = np.expm1(val_portfolio_stddev * z_score * np.sqrt(holding_period))
-val_var = abs(np.sum(val_notional_values) * val_shift)
+val_log_return = val_portfolio_stddev * z_score * np.sqrt(holding_period)
+val_percentage_return = np.expm1(val_log_return)
+val_var = np.sum(val_notional_values) * val_percentage_return * -1
 
 helper_functions.output(f"Portfolio standard deviation: {portfolio_stddev:.2%}")
-helper_functions.output(f"Associated % return: {shift:.2%}")
-helper_functions.output(f"Associated % return (full portfolio / rigorous): {val_shift:.2%}")
+helper_functions.output(f"Associated % return: {percentage_return:.2%}")
+helper_functions.output(f"Associated % return (full portfolio / rigorous): {val_percentage_return:.2%}")
 helper_functions.output(f"Associated log return: {portfolio_stddev * z_score * np.sqrt(holding_period):.2%}")
 helper_functions.output(f"Associated log return (full portfolio / rigorous): {val_portfolio_stddev * z_score * np.sqrt(holding_period):.2%}")
 helper_functions.output("Total portfolio value: $" + f'{np.sum(notional_values):,.2f}')
