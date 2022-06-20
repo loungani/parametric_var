@@ -22,20 +22,16 @@ def get_prices(ticker, start_date, end_date, specified_column):
 def get(tickers, start_date, end_date, specified_column):
     forwards_list: List[float] = []
     prices_df = pd.DataFrame()
-    returns_df = pd.DataFrame()
 
     first = True
     for ticker in tickers:
         prices = get_prices(ticker, start_date, end_date, specified_column)
-        returns = np.log(prices).diff()[1:]
 
         if first:
             prices_df = prices.to_frame().rename(columns={specified_column: ticker})
-            returns_df = returns.to_frame().rename(columns={specified_column: ticker})
             first = False
         else:
             prices_df = prices_df.join(prices.to_frame().rename(columns={specified_column: ticker}))
-            returns_df = returns_df.join(returns.to_frame().rename(columns={specified_column: ticker}))
 
         forwards_list.append(list(prices).pop())
-    return prices_df, returns_df, forwards_list
+    return prices_df, forwards_list

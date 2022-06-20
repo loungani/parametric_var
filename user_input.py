@@ -36,6 +36,25 @@ def get_int(message, int_min=None, int_max=None):
             helper_functions.output("Error caught in get_int. Stack trace: " + str(e))
 
 
+def get_float(message, float_min=None, float_max=None) -> float:
+    need_input = True
+    while need_input:
+        try:
+            io = input(message)
+            io = float(io)
+            if float_min is not None:
+                if io < float_min:
+                    raise ValueError("Expected input greater than: " + str(float_min) +
+                                     ". Received: " + str(io))
+            if float_max is not None:
+                if io > float_max:
+                    raise ValueError("Expected input less than: " + str(float_max) +
+                                     ". Received: " + str(io))
+            return io
+        except Exception as e:
+            helper_functions.output("Error caught in get_float. Stack trace: " + str(e))
+
+
 def get_arguments():
     tickers: List[str] = []
     positions: List[float] = []
@@ -75,22 +94,3 @@ def get_arguments():
             helper_functions.new_line()
 
     return tickers, positions, start_date, end_date, confidence_level, holding_period
-
-
-def export_diagnostics(positions_detail_df, prices_df, returns_df, valuations_df,
-                       valuations_returns,  corr_mx, vol_mx, vcv_mx, eigenvalue_df, eigenvector_df):
-    positions_detail_df.to_csv("positions_detail.csv")
-    prices_df.to_csv("prices.csv")
-    returns_df.to_csv("returns.csv")
-    valuations_df.to_csv("valuations.csv")
-    valuations_returns.to_csv("valuation_returns.csv")
-    corr_mx.to_csv("correlation_matrix.csv")
-    vol_mx.to_csv("volatility_matrix.csv")
-    vcv_mx.to_csv("variance_covariance_matrix.csv")
-    eigenvalue_df.to_csv("eigenvalues.csv")
-    eigenvector_df.to_csv("eigenvectors.csv")
-
-
-def export_pca(reduced_eigenvalue_matrix, reduced_covariance_matrix):
-    reduced_eigenvalue_matrix.to_csv("reduced_eigenvalue_matrix.csv")
-    reduced_covariance_matrix.to_csv("reduced_covariance_matrix.csv")

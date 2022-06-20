@@ -16,46 +16,56 @@ end_date: str
 specified_column: str = "Close"
 
 # main body of code
-
 tickers, positions, start_date, end_date, confidence_level, holding_period = user_input.get_arguments()
-# TODO: for VCV approach, should use percentage returns rather than log-returns
-prices_df, returns_df, forwards_list = query_data.get(tickers, start_date, end_date, specified_column)
-corr_mx = numerical_functions.get_corr_mx(returns_df, "ewma", tickers, ewma_lambda)
-vol_mx = numerical_functions.get_vol_mx(prices_df, ewma_lambda, "ewma")
+prices, forwards_list = query_data.get(tickers, start_date, end_date, specified_column)
+percentage_returns = numerical_functions.calculate_returns(prices, calc_type="percentage")
+
+use_ewma = \
+    user_input.get_boolean("Use EWMA method for estimating parameters? Alternative is equally weighted. (Y/N) ")
+if use_ewma:
+    ewma_lambda = user_input.get_float("Specify attenuation factor between 0 and 1 for EWMA. "
+                                       "(Convention: 0.95)", float_min=0, float_max=1)
+    averaging_type = "ewma"
+else:
+    averaging_type = "simple"
+
+corr_mx = numerical_functions.get_corr_mx(percentage_returns, averaging_type, tickers, ewma_lambda)
+vol_mx = numerical_functions.get_vol_mx(percentage_returns, ewma_lambda, averaging_type)
 vcv_mx = (vol_mx.dot(corr_mx)).dot(vol_mx)
 
 forwards = np.array(forwards_list)
 notional_values = positions * forwards
 weights = notional_values / np.sum(notional_values)
 
-# TODO: add calculation to account for mu not necessarily equal to 0
 # TODO: abstract some of this logic since I'm doing it twice
 final = float((weights.dot(vcv_mx)).dot(weights.transpose()))
 portfolio_stddev = np.sqrt(final)
-z_score = st.norm.ppf(1-confidence_level)
-log_return = portfolio_stddev * z_score * np.sqrt(holding_period)
+z_score = st.norm.ppf(1 - confidence_level)
+portfolio_log_return = portfolio_stddev * z_score * np.sqrt(holding_period)
 
 portfolio_mean_return: float = 0
 return_averages = [0] * len(tickers)
 estimate_mean_return = user_input.get_boolean("Estimate mean portfolio return? Alternative will assume mean of 0. "
                                               "(Y/N) ")
-if estimate_mean_return:
-    return_averages = [np.average(returns_df[ticker]) for ticker in tickers]
-    portfolio_mean_return = np.array(return_averages).dot(weights)
-log_return += portfolio_mean_return * holding_period
 
-percentage_return = np.expm1(log_return)
-var = np.sum(notional_values) * percentage_return * -1
+# TODO: Look into EWMA calculation for mean returns?
+if estimate_mean_return:
+    return_averages = [np.average(percentage_returns[ticker]) for ticker in tickers]
+    portfolio_mean_return = np.array(return_averages).dot(weights)
+portfolio_log_return += portfolio_mean_return * holding_period
+
+portfolio_percentage_return = np.expm1(portfolio_log_return)
+var = abs(np.sum(notional_values)) * portfolio_percentage_return * -1
 
 # Diagnostic: full valuation test / rigorous
-valuations_df: pd.DataFrame = numerical_functions.calculate_valuations(prices_df, tickers, positions)
-valuation_returns = np.log(valuations_df).diff()[1:]
-val_corr_mx = numerical_functions.get_corr_mx(valuation_returns, "ewma", ['Portfolio Valuation'],
-                                              ewma_lambda) # should always be 1 matrix
-val_vol_mx = numerical_functions.get_vol_mx(valuations_df, ewma_lambda, "ewma")
+valuations: pd.DataFrame = numerical_functions.calculate_valuations(prices, tickers, positions)
+valuation_log_returns = numerical_functions.calculate_returns(valuations, calc_type="log")
+val_corr_mx = numerical_functions.get_corr_mx(valuation_log_returns, averaging_type, ['Portfolio Valuation'],
+                                              ewma_lambda)  # should always be 1 matrix
+val_vol_mx = numerical_functions.get_vol_mx(valuation_log_returns, ewma_lambda, averaging_type)
 val_vcv_mx = (val_vol_mx.dot(val_corr_mx)).dot(val_vol_mx)
 
-val_notional_values = [valuations_df.iloc[-1]['Portfolio Valuation']]
+val_notional_values = [valuations.iloc[-1]['Portfolio Valuation']]
 val_weights = val_notional_values / np.sum(val_notional_values)
 val_final = float((val_weights.dot(val_vcv_mx)).dot(val_weights.transpose()))
 val_portfolio_stddev = np.sqrt(val_final)
@@ -63,24 +73,28 @@ val_log_return = val_portfolio_stddev * z_score * np.sqrt(holding_period)
 
 val_portfolio_mean_return: float = 0
 if estimate_mean_return:
-    val_portfolio_mean_return = np.average(valuation_returns)
+    val_portfolio_mean_return = np.average(valuation_log_returns)
 val_log_return += val_portfolio_mean_return * holding_period
 
 val_percentage_return = np.expm1(val_log_return)
-val_var = np.sum(val_notional_values) * val_percentage_return * -1
+val_var = abs(np.sum(val_notional_values)) * val_percentage_return * -1
 
+helper_functions.new_line()
+helper_functions.output("Total portfolio value: $" + f'{np.sum(notional_values):,.2f}')
 helper_functions.output(f"Portfolio standard deviation: {portfolio_stddev:.2%}")
 helper_functions.output(f"Portfolio mean return: {portfolio_mean_return:.2%}")
-helper_functions.output(f"Portfolio mean return (full portfolio/rigorous): {val_portfolio_mean_return:.2%}")
-helper_functions.output(f"Associated % return: {percentage_return:.2%}")
-helper_functions.output(f"Associated % return (full portfolio / rigorous): {val_percentage_return:.2%}")
-helper_functions.output(f"Associated log return: {log_return:.2%}")
-helper_functions.output(f"Associated log return (full portfolio / rigorous): {val_log_return:.2%}")
-helper_functions.output("Total portfolio value: $" + f'{np.sum(notional_values):,.2f}')
+helper_functions.output(f"Associated log return: {portfolio_log_return:.2%}")
+helper_functions.output(f"Associated % return: {portfolio_percentage_return:.2%}")
 helper_functions.output(str(holding_period) + "-day" + f"{confidence_level: .2%}"
                         + " VaR: $" + f'{var:,.2f}')
+helper_functions.output(f"Portfolio standard deviation (full portfolio/rigorous): {val_portfolio_stddev:.2%}")
+helper_functions.output(f"Portfolio mean return (full portfolio/rigorous): {val_portfolio_mean_return:.2%}")
+helper_functions.output(f"Associated log return (full portfolio / rigorous): {val_log_return:.2%}")
+helper_functions.output(f"Associated % return (full portfolio / rigorous): {val_percentage_return:.2%}")
 helper_functions.output(str(holding_period) + "-day" + f"{confidence_level: .2%}"
                         + " VaR (full portfolio / rigorous): $" + f'{val_var:,.2f}')
+
+# TODO: Plotting assumed and historical distribution of returns
 
 # det: should always be between 0 and 1. values close to 0 indicate multicollinearity
 det = np.linalg.det(corr_mx)
@@ -147,9 +161,14 @@ if user_input.get_boolean("Export diagnostics? (Y/N) "):
                                        columns=['tickers', 'positions', 'weights', 'forwards',
                                                 'notional_values', 'average_return'])
     positions_detail_df.set_index('tickers', inplace=True)
-    # TODO: can simplify this by exporting zip of dataframes and filenames
-    user_input.export_diagnostics(positions_detail_df, prices_df, returns_df, valuations_df,
-                                  valuation_returns, corr_mx, vol_mx, vcv_mx, eigenvalue_df,
-                                  eigenvector_df)
+    for dataframe, name in zip([positions_detail_df, prices, percentage_returns, valuations,
+                                valuation_log_returns, corr_mx, vol_mx, vcv_mx, eigenvalue_df,
+                                eigenvector_df],
+                               ['positions.csv', 'prices.csv', 'percentage_returns.csv',
+                                'valuation_log_returns.csv', 'valuations.csv', 'valuation_returns.csv',
+                                'corr_mx.csv', 'vol_mx.csv', 'vcv_mx.csv',
+                                'eigenvalues.csv', 'eigenvectors.csv']):
+        dataframe.to_csv(name)
     if (reduced_eigenvalue_matrix is not None) and (reduced_covariance_matrix is not None):
-        user_input.export_pca(reduced_eigenvalue_matrix, reduced_covariance_matrix)
+        reduced_eigenvalue_matrix.to_csv("reduced_eigenvalue_matrix.csv")
+        reduced_covariance_matrix.to_csv("reduced_covariance_matrix.csv")

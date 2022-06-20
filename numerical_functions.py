@@ -4,20 +4,35 @@ import numpy as np
 import pandas as pd
 
 
-def get_ew_return(ewma_lambda, prev, current_price, prev_price) -> float:
-    return np.sqrt(ewma_lambda * np.square(prev) + (1 - ewma_lambda) * np.square(np.log(current_price / prev_price)))
+# TODO: Error handling in return calc? (Zero division and negative prices)
+def calculate_percentage_return(current_price, next_price):
+    return next_price / current_price - 1
 
 
-def get_volatility_estimate(ewma_lambda, prices, averaging_type) -> float:
-    if averaging_type == "simple":
-        return float(np.std(np.log(prices).diff()[1:]))
-    elif averaging_type == "ewma":
-        vol_estimate = np.log(prices[1] / prices[0])
-        for i in range(1, len(prices) - 1):
-            vol_estimate = get_ew_return(ewma_lambda, vol_estimate, prices[i + 1], prices[i])
-        return vol_estimate
+def calculate_log_return(current_price, next_price):
+    return np.log(next_price / current_price)
+
+
+def calculate_returns(dataframe, calc_type):
+    return_series_list = []
+    if calc_type == "percentage":
+        func = calculate_percentage_return
+    elif calc_type == "log":
+        func = calculate_log_return
     else:
-        raise ValueError("Bad averaging type passed to get_volatility_estimate")
+        raise ValueError("Bad return calculation specified.")
+
+    for ticker in dataframe.columns:
+        price_series = dataframe[ticker]
+        return_series = [func(current_price, next_price) for current_price, next_price
+                         in zip(price_series[:-1], price_series[1:])]
+        return_series_list += [return_series]
+    return pd.DataFrame(dict(zip(dataframe.columns, return_series_list)), index=dataframe.index[1:])
+
+
+# TODO: error handling for undefined log returns
+def get_ew_return(ewma_lambda, prev_estimate, current_return) -> float:
+    return np.sqrt(ewma_lambda * np.square(prev_estimate) + (1 - ewma_lambda) * np.square(current_return))
 
 
 def create_ewma_weights(length, ewma_lambda, ascending):
@@ -33,7 +48,32 @@ def create_ewma_weights(length, ewma_lambda, ascending):
         return mx
 
 
+# TODO: would like to be able to export diagnostics for EWMA returns
+def get_volatility_estimate(ewma_lambda, returns_series, averaging_type) -> float:
+    if averaging_type == "simple":
+        # TODO: Check to see if should be ddof = 1 for stddev calc
+        return float(np.std(returns_series))
+    elif averaging_type == "ewma":
+        vol_estimate = returns_series[0]
+        for i in range(1, len(returns_series)):
+            vol_estimate = get_ew_return(ewma_lambda, vol_estimate, returns_series[i])
+        return vol_estimate
+    else:
+        raise ValueError("Bad averaging type passed to get_volatility_estimate")
+
+
+def get_vol_mx(returns, ewma_lambda, averaging_type):
+    vol_list = []
+    for column in returns:
+        vol_list.append(get_volatility_estimate(ewma_lambda, returns[column], averaging_type))
+    vol_mx = np.identity(len(vol_list))
+    np.fill_diagonal(vol_mx, np.array(vol_list))
+    vol_mx = pd.DataFrame(vol_mx, columns=returns.columns, index=returns.columns)
+    return vol_mx
+
+
 def get_corr_mx(df, correlation_type, tickers, ewma_lambda):
+    df = df.copy()  # Don't want to modify original
     if correlation_type == 'simple':
         return df.corr()
     elif correlation_type == 'ewma':
@@ -55,16 +95,6 @@ def get_corr_mx(df, correlation_type, tickers, ewma_lambda):
         return corr_mx
     else:
         raise ValueError("Bad correlation type specified")
-
-
-def get_vol_mx(prices_df, ewma_lambda, averaging_type):
-    vol_list = []
-    for column in prices_df:
-        vol_list.append(get_volatility_estimate(ewma_lambda, prices_df[column], averaging_type))
-    vol_mx = np.identity(len(vol_list))
-    np.fill_diagonal(vol_mx, np.array(vol_list))
-    vol_mx = pd.DataFrame(vol_mx, columns=prices_df.columns, index=prices_df.columns)
-    return vol_mx
 
 
 def run_principal_components_analysis(num_components: int, eigenvalue_df, eigenvector_df):
