@@ -18,6 +18,7 @@ specified_column: str = "Close"
 # main body of code
 
 tickers, positions, start_date, end_date, confidence_level, holding_period = user_input.get_arguments()
+# TODO: for VCV approach, should use percentage returns rather than log-returns
 prices_df, returns_df, forwards_list = query_data.get(tickers, start_date, end_date, specified_column)
 corr_mx = numerical_functions.get_corr_mx(returns_df, "ewma", tickers, ewma_lambda)
 vol_mx = numerical_functions.get_vol_mx(prices_df, ewma_lambda, "ewma")
@@ -28,10 +29,21 @@ notional_values = positions * forwards
 weights = notional_values / np.sum(notional_values)
 
 # TODO: add calculation to account for mu not necessarily equal to 0
+# TODO: abstract some of this logic since I'm doing it twice
 final = float((weights.dot(vcv_mx)).dot(weights.transpose()))
 portfolio_stddev = np.sqrt(final)
 z_score = st.norm.ppf(1-confidence_level)
 log_return = portfolio_stddev * z_score * np.sqrt(holding_period)
+
+portfolio_mean_return: float = 0
+return_averages = [0] * len(tickers)
+estimate_mean_return = user_input.get_boolean("Estimate mean portfolio return? Alternative will assume mean of 0. "
+                                              "(Y/N) ")
+if estimate_mean_return:
+    return_averages = [np.average(returns_df[ticker]) for ticker in tickers]
+    portfolio_mean_return = np.array(return_averages).dot(weights)
+log_return += portfolio_mean_return * holding_period
+
 percentage_return = np.expm1(log_return)
 var = np.sum(notional_values) * percentage_return * -1
 
@@ -48,14 +60,22 @@ val_weights = val_notional_values / np.sum(val_notional_values)
 val_final = float((val_weights.dot(val_vcv_mx)).dot(val_weights.transpose()))
 val_portfolio_stddev = np.sqrt(val_final)
 val_log_return = val_portfolio_stddev * z_score * np.sqrt(holding_period)
+
+val_portfolio_mean_return: float = 0
+if estimate_mean_return:
+    val_portfolio_mean_return = np.average(valuation_returns)
+val_log_return += val_portfolio_mean_return * holding_period
+
 val_percentage_return = np.expm1(val_log_return)
 val_var = np.sum(val_notional_values) * val_percentage_return * -1
 
 helper_functions.output(f"Portfolio standard deviation: {portfolio_stddev:.2%}")
+helper_functions.output(f"Portfolio mean return: {portfolio_mean_return:.2%}")
+helper_functions.output(f"Portfolio mean return (full portfolio/rigorous): {val_portfolio_mean_return:.2%}")
 helper_functions.output(f"Associated % return: {percentage_return:.2%}")
 helper_functions.output(f"Associated % return (full portfolio / rigorous): {val_percentage_return:.2%}")
-helper_functions.output(f"Associated log return: {portfolio_stddev * z_score * np.sqrt(holding_period):.2%}")
-helper_functions.output(f"Associated log return (full portfolio / rigorous): {val_portfolio_stddev * z_score * np.sqrt(holding_period):.2%}")
+helper_functions.output(f"Associated log return: {log_return:.2%}")
+helper_functions.output(f"Associated log return (full portfolio / rigorous): {val_log_return:.2%}")
 helper_functions.output("Total portfolio value: $" + f'{np.sum(notional_values):,.2f}')
 helper_functions.output(str(holding_period) + "-day" + f"{confidence_level: .2%}"
                         + " VaR: $" + f'{var:,.2f}')
@@ -122,9 +142,12 @@ if user_input.get_boolean("Reduce dimensionality using PCA? (Y/N) "):
                             + " PCA-adjusted VaR: $" + f'{adjusted_var:,.2f}')
 
 if user_input.get_boolean("Export diagnostics? (Y/N) "):
-    positions_detail_df = pd.DataFrame(list(zip(tickers, positions, weights, forwards, notional_values)),
-                                       columns=['tickers', 'positions', 'weights', 'forwards', 'notional_values'])
+    positions_detail_df = pd.DataFrame(list(zip(tickers, positions, weights, forwards,
+                                                notional_values, return_averages)),
+                                       columns=['tickers', 'positions', 'weights', 'forwards',
+                                                'notional_values', 'average_return'])
     positions_detail_df.set_index('tickers', inplace=True)
+    # TODO: can simplify this by exporting zip of dataframes and filenames
     user_input.export_diagnostics(positions_detail_df, prices_df, returns_df, valuations_df,
                                   valuation_returns, corr_mx, vol_mx, vcv_mx, eigenvalue_df,
                                   eigenvector_df)
