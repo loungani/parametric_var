@@ -32,23 +32,20 @@ else:
 corr_mx = numerical_functions.get_corr_mx(percentage_returns, averaging_type, tickers, ewma_lambda)
 vol_mx = numerical_functions.get_vol_mx(percentage_returns, ewma_lambda, averaging_type)
 vcv_mx = (vol_mx.dot(corr_mx)).dot(vol_mx)
-
 forwards = np.array(forwards_list)
 notional_values = positions * forwards
 weights = notional_values / np.sum(notional_values)
 
-# TODO: abstract some of this logic since I'm doing it twice
-final = float((weights.dot(vcv_mx)).dot(weights.transpose()))
-portfolio_stddev = np.sqrt(final)
+# TODO: abstract some of this logic since I'm doing it twice. Nico recommended VaR object
+portfolio_stddev = np.sqrt(float((weights.dot(vcv_mx)).dot(weights.transpose())))
 z_score = st.norm.ppf(1 - confidence_level)
 portfolio_log_return = portfolio_stddev * z_score * np.sqrt(holding_period)
-
 portfolio_mean_return: float = 0
 return_averages = [0] * len(tickers)
 estimate_mean_return = user_input.get_boolean("Estimate mean portfolio return? Alternative will assume mean of 0. "
                                               "(Y/N) ")
 
-# TODO: Look into EWMA calculation for mean returns?
+# TODO: Option for EWMA calculation for mean returns?
 if estimate_mean_return:
     return_averages = [np.average(percentage_returns[ticker]) for ticker in tickers]
     portfolio_mean_return = np.array(return_averages).dot(weights)
@@ -67,8 +64,7 @@ val_vcv_mx = (val_vol_mx.dot(val_corr_mx)).dot(val_vol_mx)
 
 val_notional_values = [valuations.iloc[-1]['Portfolio Valuation']]
 val_weights = val_notional_values / np.sum(val_notional_values)
-val_final = float((val_weights.dot(val_vcv_mx)).dot(val_weights.transpose()))
-val_portfolio_stddev = np.sqrt(val_final)
+val_portfolio_stddev = np.sqrt(float((val_weights.dot(val_vcv_mx)).dot(val_weights.transpose())))
 val_log_return = val_portfolio_stddev * z_score * np.sqrt(holding_period)
 
 val_portfolio_mean_return: float = 0
@@ -99,6 +95,8 @@ helper_functions.output(str(holding_period) + "-day" + f"{confidence_level: .2%}
 # det: should always be between 0 and 1. values close to 0 indicate multicollinearity
 det = np.linalg.det(corr_mx)
 helper_functions.output("Determinant of correlation matrix: " + str(det))
+
+# TODO: Move some of this logic to numerical_functions module
 w, v = np.linalg.eig(vcv_mx)  # note: eigenvectors are returned as columns in the matrix
 if any([eigenvalue < 0 for eigenvalue in w]):
     helper_functions.output("Warning: negative eigenvalue found. "
