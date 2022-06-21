@@ -6,6 +6,7 @@ import query_data
 import numerical_functions
 import helper_functions as hf
 import matplotlib.pyplot as plt
+import plotting
 
 # globals / inputs
 ewma_lambda: float = .95
@@ -16,11 +17,11 @@ end_date: str
 specified_column: str = "Close"
 
 # TODO: Error handling when price series are incomplete/new. Example is OPEN ticker which breaks code
+# TODO: I think the logic for applying EWMA calculations can be massively simplified
 
 # main body of code
 tickers, positions, start_date, end_date, confidence_level, holding_period = user_input.get_arguments()
 prices, forwards_list = query_data.get(tickers, start_date, end_date, specified_column)
-# TODO: user option for percent vs log returns
 calc_type = user_input.get_calc_type()
 returns = numerical_functions.calculate_returns(prices, calc_type=calc_type)
 
@@ -98,17 +99,39 @@ hf.output(str(holding_period) + "-day % return (full portfolio / rigorous): " + 
 hf.output(str(holding_period) + "-day" + f"{confidence_level: .2%}"
           + " VaR (full portfolio / rigorous): $" + f'{val_var:,.2f}')
 
-# TODO: Plotting assumed and historical distribution of returns
-
+# Plotting prices and assumed and historical distribution of returns
 hf.new_line()
-try:
-    det = np.linalg.det(corr_mx)  # det: should always be between 0 and 1. values close to 0 indicate multicollinearity
-    hf.output("Determinant of correlation matrix: " + str(det))
-except Exception as e:
-    hf.output("Error when trying to compute determinant of correlation matrix.")
-    hf.output("Stack trace: " + str(e))
+plot_data = user_input.get_boolean("View plots of stock data? (Y/N) ")
+if plot_data:
+    plotting.line_plots([prices[ticker] for ticker in tickers], series_labels=tickers, ylabel='Share price ($/share)',
+                        xlabel='Date', title='Stock prices')
+    plotting.line_plots([returns[ticker] for ticker in tickers], series_labels=tickers, ylabel=calc_type + ' return',
+                        xlabel='Date', title='Stock returns')
+    for idx, ticker in enumerate(tickers):
+        plotting.stock_return_histogram(returns[ticker], ticker=ticker, mu=return_averages[idx],
+                                        sigma=vol_mx.iloc[idx][idx], calc_type=calc_type)
+    plotting.line_plots([valuations], series_labels=['Portfolio Valuations'], ylabel='Portfolio valuation ($)',
+                        xlabel='Date', title='Portfolio Valuations')
+    plotting.line_plots([valuation_log_returns], series_labels=['Portfolio Log Returns'],
+                        ylabel='log return', xlabel='Date', title='Portfolio Log Returns')
+    plotting.stock_return_histogram(valuation_log_returns, ticker='Portfolio', mu=val_portfolio_mean_return,
+                                    sigma=val_portfolio_stddev, calc_type='log')
 
-# TODO: Move some of this logic to numerical_functions module
+# Diagnostics: testing determinant
+hf.new_line()
+hf.output("The determinant of the correlation matrix should always be between 0 and 1.")
+hf.output("Values close to 0 may indicate issues with near multicollinearity.")
+hf.output("Note that for large portfolios, calculating the determinant may have significant computation time.")
+calc_determinant = user_input.get_boolean("Calculate determinant of correlation matrix? (Y/N) ")
+if calc_determinant:
+    try:
+        det = np.linalg.det(corr_mx)
+        hf.output("Determinant of correlation matrix: " + str(det))
+    except Exception as e:
+        hf.output("Error when trying to compute determinant of correlation matrix.")
+        hf.output("Stack trace: " + str(e))
+
+# TODO: Move some of this logic to other modules
 eigenvalue_df = None
 eigenvector_df = None
 try:
