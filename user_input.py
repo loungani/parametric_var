@@ -94,3 +94,22 @@ def get_arguments():
             helper_functions.new_line()
 
     return tickers, positions, start_date, end_date, confidence_level, holding_period
+
+
+def get_calc_type() -> str:
+    helper_functions.new_line()
+    helper_functions.output("For constructing the covariance matrix, may assume normality of either "
+                            "percent or log-returns.")
+    helper_functions.output("Normality of the log-returns is the approximation suggested by the "
+                            "RiskMetrics technical document: "
+                            "https://www.msci.com/documents/10199/5915b101-4206-4ba0-aee2-3449d5c7e95a")
+    helper_functions.output("However, in constructing the covariance matrix, assuming normality of the "
+                            "percent return allows for logical consistency following the assumption.")
+    helper_functions.output("Regardless of assumption made, a diagnostic test will run afterwards assuming "
+                            "normality of the log-returns of the entire portfolio.")
+    use_percent_return = get_boolean("Construct covariance matrix using normality of percent returns? "
+                                     "Alternative will assume normality of the log-return. (Y/N) ")
+    if use_percent_return:
+        return "percentage"
+    else:
+        return "log"

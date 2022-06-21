@@ -20,7 +20,9 @@ specified_column: str = "Close"
 # main body of code
 tickers, positions, start_date, end_date, confidence_level, holding_period = user_input.get_arguments()
 prices, forwards_list = query_data.get(tickers, start_date, end_date, specified_column)
-percentage_returns = numerical_functions.calculate_returns(prices, calc_type="percentage")
+# TODO: user option for percent vs log returns
+calc_type = user_input.get_calc_type()
+returns = numerical_functions.calculate_returns(prices, calc_type=calc_type)
 
 use_ewma = \
     user_input.get_boolean("Use EWMA method for estimating parameters? Alternative is equally weighted. (Y/N) ")
@@ -31,27 +33,33 @@ if use_ewma:
 else:
     averaging_type = "simple"
 
-corr_mx = numerical_functions.get_corr_mx(percentage_returns, averaging_type, tickers, ewma_lambda)
-vol_mx = numerical_functions.get_vol_mx(percentage_returns, ewma_lambda, averaging_type)
+corr_mx = numerical_functions.get_corr_mx(returns, averaging_type, tickers, ewma_lambda)
+vol_mx = numerical_functions.get_vol_mx(returns, ewma_lambda, averaging_type)
 vcv_mx = (vol_mx.dot(corr_mx)).dot(vol_mx)
 forwards = np.array(forwards_list)
 notional_values = positions * forwards
 weights = notional_values / np.sum(notional_values)
 
-# TODO: abstract some of this logic since I'm doing it twice. Nico recommended VaR object
-portfolio_stddev = np.sqrt(float((weights.dot(vcv_mx)).dot(weights.transpose())))
-z_score = st.norm.ppf(1 - confidence_level)
-portfolio_percentage_return = portfolio_stddev * z_score * np.sqrt(holding_period)
+# TODO: Option for EWMA calculation for mean returns?
 portfolio_mean_return: float = 0
 return_averages = [0] * len(tickers)
 estimate_mean_return = user_input.get_boolean("Estimate mean portfolio return? Alternative will assume mean of 0. "
                                               "(Y/N) ")
-
-# TODO: Option for EWMA calculation for mean returns?
 if estimate_mean_return:
-    return_averages = [np.average(percentage_returns[ticker]) for ticker in tickers]
+    return_averages = [np.average(returns[ticker]) for ticker in tickers]
     portfolio_mean_return = np.array(return_averages).dot(weights)
-portfolio_percentage_return += portfolio_mean_return * holding_period
+
+# TODO: abstract some of this logic since I'm doing it twice. Nico recommended VaR object
+portfolio_stddev = np.sqrt(float((weights.dot(vcv_mx)).dot(weights.transpose())))
+z_score = st.norm.ppf(1 - confidence_level)
+portfolio_log_return = None
+if calc_type == "percentage":
+    portfolio_percentage_return = portfolio_stddev * z_score * np.sqrt(holding_period)
+    portfolio_percentage_return += portfolio_mean_return * holding_period
+else:
+    portfolio_log_return = portfolio_stddev * z_score * np.sqrt(holding_period)
+    portfolio_log_return += portfolio_mean_return * holding_period
+    portfolio_percentage_return = np.expm1(portfolio_log_return)
 var = abs(np.sum(notional_values)) * portfolio_percentage_return * -1
 
 # Diagnostic: full valuation test / rigorous
@@ -171,9 +179,9 @@ if user_input.get_boolean("Export diagnostics? (Y/N) "):
                                        columns=['tickers', 'positions', 'weights', 'forwards',
                                                 'notional_values', 'average_return'])
     positions_detail_df.set_index('tickers', inplace=True)
-    for dataframe, name in zip([positions_detail_df, prices, percentage_returns, valuations,
+    for dataframe, name in zip([positions_detail_df, prices, returns, valuations,
                                 valuation_log_returns, corr_mx, vol_mx, vcv_mx],
-                               ['positions.csv', 'prices.csv', 'percentage_returns.csv',
+                               ['positions.csv', 'prices.csv', 'asset_'+calc_type+'_returns.csv',
                                 'valuations.csv', 'valuation_log_returns.csv',
                                 'corr_mx.csv', 'vol_mx.csv', 'vcv_mx.csv']):
         dataframe.to_csv(name)
